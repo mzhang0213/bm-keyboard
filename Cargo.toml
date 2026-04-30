@@ -14,3 +14,7 @@ path = "src/overlay.rs"
 [[example]]
 name = "overlay_dev"
 path = "src/overlay_dev.rs"
+
+[[example]]
+name = "char_demo"
+path = "src/char_demo.rs"
