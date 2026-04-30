@@ -5,7 +5,12 @@ edition = "2024"
 
 [dependencies]
 iced = "0.13"
+rdev = { version = "0.5", features = ["unstable_grab"] }
 
 [[example]]
 name = "overlay"
-path = "src/examples/overlay.rs"
+path = "src/overlay.rs"
+
+[[example]]
+name = "overlay_dev"
+path = "src/overlay_dev.rs"
