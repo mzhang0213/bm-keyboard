@@ -1,3 +1,5 @@
+use std::iter::Peekable;
+use std::str::Chars;
 use crate::input_logic::InputLogic;
 use crate::key_event::KeyEvent;
 use iced::widget::{container, mouse_area, text};
@@ -165,6 +167,166 @@ impl SynthesizerAgent {
         Size::new(w, h)
     }
 }
+
+
+
+
+/**
+A struct for a multiple choice char combo
+- Two letter consonants
+- Vowel romanization ambiguity - oe vs wae vs woe, ui eui, etc.
+*/
+pub struct CharChoice {
+    text: String,
+    choices: Vec<String>
+}
+
+impl Default for CharChoice {
+    fn default() -> Self {
+        Self {
+            text: String::new(),
+            choices: Vec::new()
+        }
+    }
+}
+
+impl CharChoice {
+    pub fn new(&mut self, input: &str) {
+        self.text = input;
+        self.tokenize();
+    }
+    fn tokenize(&self) {
+        match (self.text) {
+            "wae" => {
+                self.choices.append()
+            }
+            "oi" => {
+                self.choices.append("oe")
+            }
+            "wae" => {
+                self.choices.append()
+            }
+            "wae" => {
+                self.choices.append()
+            }
+            _ => {}
+        }
+    }
+}
+
+
+pub struct CharScanner {
+    tokens: Vec<String>,
+    digraph_count: usize,
+}
+
+impl Default for CharScanner {
+    fn default() -> Self {
+        Self {
+            tokens: Vec::new(),
+            digraph_count: 0,
+        }
+    }
+}
+
+impl CharScanner {
+    pub fn tokens(&self) -> &[String] {
+        &self.tokens
+    }
+
+    pub fn scan(&mut self, input: &str) {
+        let mut rest = input.chars().peekable();
+        while let Some(c) = rest.next() {
+            let token = self.classify(c, &mut rest);
+            self.tokens.push(token);
+        }
+    }
+
+    fn classify(&mut self, c: char, rest: &mut Peekable<Chars<'_>>) -> String {
+        if let Some(&next) = rest.peek() {
+            match (c, next) {
+                ('c', 'h') | ('e', 'o') | ('n', 'g') | ('g', 'g') => {
+                    rest.next();
+                    self.digraph_count += 1;
+                    return format!("[{c}{next}]");
+                }
+                _ => {}
+            }
+        }
+
+        match c {
+            'a' | 'e' | 'i' | 'o' | 'u' => format!("vowel({c})"),
+            '0'..='9' => {
+                let value = c.to_digit(10).unwrap();
+                format!("digit(value={value})")
+            }
+            'A'..='Z' | 'a'..='z' => {
+                let code = c as u32;
+                format!("alpha({c}, code=0x{code:02X})")
+            }
+            c if c.is_whitespace() => "space".into(),
+            c if c.is_ascii_punctuation() => format!("punct({c})"),
+            other => format!("other({other:?}, U+{:04X})", other as u32),
+        }
+    }
+}
+
+
+const INITIALS: [&str; 19] = [
+    "g", "gg", "n", "d", "dd", "r", "m", "b", "bb",
+    "s", "ss", "", "j", "jj", "ch", "k", "t", "p", "h",
+];
+const VOWELS: [&str; 21] = [
+    "a", "ae", "ya", "yae", "eo", "e", "yeo", "ye",
+    "o", "wa", "wae", "oe", "yo", "u", "wo", "we",
+    "wi", "yu", "eu", "ui", "i",
+];
+const FINALS: [&str; 28] = [
+    "", "g", "kk", "gs", "n", "nj", "nh", "d", "l",
+    "lg", "lm", "lb", "ls", "lt", "lp", "lh", "m",
+    "b", "bs", "s", "ss", "ng", "j", "ch", "k", "t", "p", "h",
+];
+
+fn compose(initial: u32, vowel: u32, final_: u32) -> char {
+    let codepoint = 0xAC00 + initial * 588 + vowel * 28 + final_;
+    char::from_u32(codepoint).unwrap()
+}
+
+fn decompose(syllable: char) -> (u32, u32, u32) {
+    let s = syllable as u32 - 0xAC00;
+    let initial = s / 588;
+    let vowel = (s % 588) / 28;
+    let final_ = s % 28;
+    (initial, vowel, final_)
+}
+
+
+/*
+flow:
+classify -> tokenize input, custom detect special combos
+synth -> custom algo to make valid korean words: greedy match tokens to words, edge cases matching on tokens, etc -> make korean based on confidence guesses
+    -somehow make some tokens have "confidence" where they require multiple choice
+
+detecting kr vs world:
+-see how many valid kr chars we synthesized vs how many chars inputted
+-compute some "fits korean" conversion ratio -> if str matches that, render default after input to be
+
+multiple choice
+-> how do we prevent computing and displaying all permutations of a "promblematic" multiple choice str?
+-> sol: use what jpy keyboard does: tab menu for quick accepts, space menu and segments to control what each segment should output
+    ex: <input> ggggg
+    ggg gg or gg ggg, expand
+    ggg=ㄱㄱㄱ or ㄱㄲ or ㄲㄱ
+    gg=ㄱㄱ or ㄲ
+    g=ㄱ
+
+
+rules:
+-w -> look for vowel
+-y -> look for vowel
+-pq
+ */
+
 
 fn convert(input: &str) -> String {
     //conversion script
