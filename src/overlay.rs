@@ -1,13 +1,15 @@
 mod agent;
+mod cursor;
 mod input_logic;
 mod key_event;
 mod listener;
+mod token;
 
 use agent::{DisplayOptions, InputAgent, Message, SynthesizerAgent};
 use iced::futures::channel::mpsc;
 use iced::futures::{SinkExt, Stream, StreamExt};
 use iced::widget::text;
-use iced::{stream, window, Element, Point, Subscription, Task, Theme};
+use iced::{stream, window, Element, Subscription, Task, Theme};
 
 struct App {
     input: InputAgent,
@@ -20,9 +22,12 @@ impl App {
     fn new() -> (Self, Task<Message>) {
         let opts = DisplayOptions::default();
 
+        let input_pos = cursor::snapped(-10.0);
+        let synth_pos = iced::Point::new(input_pos.x, input_pos.y - 90.0);
+
         let (input_id, input_open) = window::open(window::Settings {
             size: opts.window_size,
-            position: window::Position::Specific(Point::new(300.0, 300.0)),
+            position: window::Position::Specific(input_pos),
             decorations: false,
             resizable: false,
             level: window::Level::AlwaysOnTop,
@@ -31,7 +36,7 @@ impl App {
 
         let (synth_id, synth_open) = window::open(window::Settings {
             size: opts.window_size,
-            position: window::Position::Specific(Point::new(300.0, 210.0)),
+            position: window::Position::Specific(synth_pos),
             decorations: false,
             resizable: false,
             level: window::Level::AlwaysOnTop,

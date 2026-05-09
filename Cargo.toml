@@ -7,6 +7,9 @@ edition = "2024"
 iced = "0.13"
 rdev = { version = "0.5", features = ["unstable_grab"] }
 
+[target.'cfg(target_os = "macos")'.dependencies]
+core-graphics = "0.24"
+
 [[example]]
 name = "overlay"
 path = "src/overlay.rs"

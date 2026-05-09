@@ -2,6 +2,7 @@ use std::iter::Peekable;
 use std::str::Chars;
 use crate::input_logic::InputLogic;
 use crate::key_event::KeyEvent;
+use crate::token::Token;
 use iced::widget::{container, mouse_area, text};
 use iced::{window, Element, Font, Length, Size, Task};
 
@@ -22,6 +23,7 @@ impl Default for DisplayOptions {
         }
     }
 }
+
 
 pub struct InputAgent {
     text: String,
@@ -192,7 +194,7 @@ impl Default for CharChoice {
 
 impl CharChoice {
     pub fn new(&mut self, input: &str) {
-        self.text = input;
+        self.text = input.to_string();
         self.tokenize();
     }
     fn tokenize(&self) {
@@ -329,8 +331,18 @@ rules:
 
 
 fn convert(input: &str) -> String {
-    //conversion script
-    input.to_string()
+    let mut output = String::new();
+    let mut i = 0;
+    while i < input.len() {
+        match Token::convert(&input[i..]) {
+            Some((canonical, jamo)) => {
+                output.push(jamo);
+                i += canonical.len();
+            }
+            None => i += 1,
+        }
+    }
+    output
 }
 
 #[cfg(test)]
