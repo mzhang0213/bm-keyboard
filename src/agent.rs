@@ -180,14 +180,14 @@ A struct for a multiple choice char combo
 */
 pub struct CharChoice {
     text: String,
-    choices: Vec<String>
+    choices: Vec<String>,
 }
 
 impl Default for CharChoice {
     fn default() -> Self {
         Self {
             text: String::new(),
-            choices: Vec::new()
+            choices: Vec::new(),
         }
     }
 }
@@ -197,20 +197,16 @@ impl CharChoice {
         self.text = input.to_string();
         self.tokenize();
     }
-    fn tokenize(&self) {
-        match (self.text) {
-            "wae" => {
-                self.choices.append()
-            }
-            "oi" => {
-                self.choices.append("oe")
-            }
-            "wae" => {
-                self.choices.append()
-            }
-            "wae" => {
-                self.choices.append()
-            }
+
+    pub fn choices(&self) -> &[String] {
+        &self.choices
+    }
+
+    fn tokenize(&mut self) {
+        self.choices.clear();
+        match self.text.as_str() {
+            "oi" => self.choices.push("oe".to_string()),
+            "wae" => self.choices.push("wae".to_string()),
             _ => {}
         }
     }

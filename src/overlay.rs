@@ -3,6 +3,8 @@ mod cursor;
 mod input_logic;
 mod key_event;
 mod listener;
+#[cfg(target_os = "macos")]
+mod macos_key_tap;
 mod token;
 
 use agent::{DisplayOptions, InputAgent, Message, SynthesizerAgent};
