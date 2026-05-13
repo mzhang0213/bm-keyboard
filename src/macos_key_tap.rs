@@ -4,8 +4,21 @@ use core_graphics::event::{
     CGEvent, CGEventFlags, CGEventTap, CGEventTapLocation, CGEventTapOptions, CGEventTapPlacement,
     CGEventType, EventField, KeyCode,
 };
+use core_graphics::sys::CGEventRef;
+use foreign_types::ForeignType;
 use iced::futures::channel::mpsc::UnboundedSender;
+use std::ffi::c_ulong;
 use std::panic::{AssertUnwindSafe, catch_unwind};
+
+#[link(name = "CoreGraphics", kind = "framework")]
+unsafe extern "C" {
+    fn CGEventKeyboardGetUnicodeString(
+        event: CGEventRef,
+        max_string_length: c_ulong,
+        actual_string_length: *mut c_ulong,
+        unicode_string: *mut u16,
+    );
+}
 
 #[derive(Debug, Clone, Copy)]
 #[allow(dead_code)]
@@ -104,8 +117,12 @@ fn handle_key_event(
         return false;
     };
 
-    let Some(evt) = translate_keycode(code) else {
-        return false;
+    let evt = match special_keycode(code) {
+        Some(evt) => evt,
+        None => match unicode_string_from_event(event) {
+            Some(text) => KeyEvent::Char(text),
+            None => return false,
+        },
     };
 
     if tx.unbounded_send(evt).is_err() {
@@ -113,6 +130,28 @@ fn handle_key_event(
     }
 
     matches!(mode, TapMode::Grab)
+}
+
+fn unicode_string_from_event(event: &CGEvent) -> Option<String> {
+    let mut buf = [0u16; 8];
+    let mut actual: c_ulong = 0;
+    unsafe {
+        CGEventKeyboardGetUnicodeString(
+            event.as_ptr(),
+            buf.len() as c_ulong,
+            &mut actual as *mut c_ulong,
+            buf.as_mut_ptr(),
+        );
+    }
+    let len = actual as usize;
+    if len == 0 || len > buf.len() {
+        return None;
+    }
+    let s = String::from_utf16(&buf[..len]).ok()?;
+    if s.chars().all(|c| c.is_control()) {
+        return None;
+    }
+    Some(s)
 }
 
 fn should_pass_through(flags: CGEventFlags) -> bool {
@@ -123,65 +162,11 @@ fn should_pass_through(flags: CGEventFlags) -> bool {
     )
 }
 
-fn translate_keycode(code: u16) -> Option<KeyEvent> {
+fn special_keycode(code: u16) -> Option<KeyEvent> {
     match code {
         KeyCode::DELETE => Some(KeyEvent::Backspace),
         KeyCode::RETURN => Some(KeyEvent::Enter),
         KeyCode::ESCAPE => Some(KeyEvent::Escape),
-        _ => qwerty_char(code).map(|ch| KeyEvent::Char(ch.to_string())),
-    }
-}
-
-fn qwerty_char(code: u16) -> Option<char> {
-    match code {
-        0 => Some('a'),
-        1 => Some('s'),
-        2 => Some('d'),
-        3 => Some('f'),
-        4 => Some('h'),
-        5 => Some('g'),
-        6 => Some('z'),
-        7 => Some('x'),
-        8 => Some('c'),
-        9 => Some('v'),
-        11 => Some('b'),
-        12 => Some('q'),
-        13 => Some('w'),
-        14 => Some('e'),
-        15 => Some('r'),
-        16 => Some('y'),
-        17 => Some('t'),
-        18 => Some('1'),
-        19 => Some('2'),
-        20 => Some('3'),
-        21 => Some('4'),
-        22 => Some('6'),
-        23 => Some('5'),
-        24 => Some('='),
-        25 => Some('9'),
-        26 => Some('7'),
-        27 => Some('-'),
-        28 => Some('8'),
-        29 => Some('0'),
-        30 => Some(']'),
-        31 => Some('o'),
-        32 => Some('u'),
-        33 => Some('['),
-        34 => Some('i'),
-        35 => Some('p'),
-        37 => Some('l'),
-        38 => Some('j'),
-        39 => Some('\''),
-        40 => Some('k'),
-        41 => Some(';'),
-        42 => Some('\\'),
-        43 => Some(','),
-        44 => Some('/'),
-        45 => Some('n'),
-        46 => Some('m'),
-        47 => Some('.'),
-        49 => Some(' '),
-        50 => Some('`'),
         _ => None,
     }
 }
@@ -201,25 +186,19 @@ mod tests {
     use super::*;
 
     #[test]
-    fn translates_letters_from_macos_keycodes() {
-        assert!(matches!(translate_keycode(0), Some(KeyEvent::Char(s)) if s == "a"));
-        assert!(matches!(translate_keycode(13), Some(KeyEvent::Char(s)) if s == "w"));
-        assert!(matches!(translate_keycode(46), Some(KeyEvent::Char(s)) if s == "m"));
-    }
-
-    #[test]
     fn translates_control_keys() {
         assert!(matches!(
-            translate_keycode(KeyCode::DELETE),
+            special_keycode(KeyCode::DELETE),
             Some(KeyEvent::Backspace)
         ));
         assert!(matches!(
-            translate_keycode(KeyCode::RETURN),
+            special_keycode(KeyCode::RETURN),
             Some(KeyEvent::Enter)
         ));
         assert!(matches!(
-            translate_keycode(KeyCode::ESCAPE),
+            special_keycode(KeyCode::ESCAPE),
             Some(KeyEvent::Escape)
         ));
+        assert!(special_keycode(0).is_none());
     }
 }
